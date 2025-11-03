@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback? onMenuTap;
-  final VoidCallback? onNotificationsTap;
-
-  const HomeAppBar({
-    Key? key,
-    this.onMenuTap,
-    this.onNotificationsTap,
-  }) : super(key: key);
+  const HomeAppBar({Key? key}) : super(key: key);
 
   @override
   Size get preferredSize => const Size.fromHeight(60);
@@ -19,29 +12,25 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: Colors.white,
       elevation: 2,
       centerTitle: true,
-      title: const Text(
-        'Home',
-        style: TextStyle(
-          color: Colors.black87,
-          fontWeight: FontWeight.bold,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(0),
         ),
       ),
-      leading: IconButton(
-        icon: const Icon(Icons.menu, color: Colors.black87),
-        onPressed: onMenuTap ?? () => Scaffold.of(context).openDrawer(),
-        tooltip: 'Menu',
+      title: Image.asset(
+        'assets/images/logo.png',
+        height: 40,
+        fit: BoxFit.contain,
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
-          onPressed: onNotificationsTap ??
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('No new notifications')),
-                );
-              },
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white, Color.fromARGB(255, 238, 255, 236)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
         ),
-      ],
+      ),
     );
   }
 }

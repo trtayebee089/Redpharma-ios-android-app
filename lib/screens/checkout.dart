@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../providers/cart_provider.dart';
+import 'package:redpharmabd_app/providers/cart_provider.dart';
 import 'package:redpharmabd_app/main_screen.dart';
+import 'package:redpharmabd_app/constants/api_endpoints.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
 
   @override
-  _CheckoutScreenState createState() => _CheckoutScreenState();
+  State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
@@ -19,123 +20,73 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String fullName = '';
   String phone = '';
   String address = '';
-  String district = '';
-  String division = '';
+  String? division;
+  String? district;
   String paymentMethod = 'cash_on_delivery';
   bool isLoading = false;
 
-  // 🔹 Step Indicator
-  Widget _buildStepIndicator(int step, String title) {
-    bool isCompleted = step < currentStep;
-    bool isCurrent = step == currentStep;
+  List<dynamic> zones = [];
+  List<String> divisions = [];
+  List<Map<String, dynamic>> districts = [];
+  double shippingRate = 0.0;
 
-    Color backgroundColor = isCompleted
-        ? Colors.green
-        : isCurrent
-        ? Colors.orange.shade700
-        : Colors.grey.shade300;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            step.toString(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 60,
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isCurrent ? Colors.orange.shade700 : Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
+  @override
+  void initState() {
+    super.initState();
+    _fetchShippingZones();
   }
 
-  Widget _buildStepDivider(int step) {
-    bool isPrevCompleted = step < currentStep;
-    bool isNextDivider = step == currentStep;
-
-    if (isPrevCompleted) {
-      return Expanded(child: Container(height: 4, color: Colors.green));
-    } else if (isNextDivider) {
-      return Expanded(
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(height: 4, color: Colors.orange.shade700),
-            ),
-            Expanded(child: Container(height: 4, color: Colors.grey.shade300)),
-          ],
-        ),
-      );
-    } else {
-      return Expanded(child: Container(height: 4, color: Colors.grey.shade300));
+  Future<void> _fetchShippingZones() async {
+    try {
+      final response = await http.get(Uri.parse(ApiEndpoints.shippingZones));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final List zonesData = data['data'];
+          final Set<String> uniqueDivisions = zonesData
+              .map((z) => z['division'] as String)
+              .toSet();
+          setState(() {
+            zones = zonesData;
+            divisions = uniqueDivisions.toList();
+          });
+        }
+      } else {
+        debugPrint("❌ Failed to load shipping zones");
+      }
+    } catch (e) {
+      debugPrint("⚠️ Error fetching zones: $e");
     }
   }
 
-  // 🔹 Step 1 — Shipping Info
-  Widget _buildStepOne() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Shipping Information",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 20),
-          _buildInputField(
-            label: "Full Name",
-            icon: Icons.person_outline,
-            onSaved: (v) => fullName = v!,
-            validator: (v) => v!.isEmpty ? "Enter your name" : null,
-          ),
-          _buildInputField(
-            label: "Phone Number",
-            icon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-            onSaved: (v) => phone = v!,
-            validator: (v) => v!.isEmpty ? "Enter phone number" : null,
-          ),
-          _buildInputField(
-            label: "Address",
-            icon: Icons.location_on_outlined,
-            onSaved: (v) => address = v!,
-            validator: (v) => v!.isEmpty ? "Enter address" : null,
-          ),
-          _buildInputField(
-            label: "Division",
-            icon: Icons.public_outlined,
-            onSaved: (v) => division = v!,
-            validator: (v) => v!.isEmpty ? "Enter division" : null,
-          ),
-        ],
-      ),
+  void _onDivisionSelected(String selectedDivision) {
+    final filteredDistricts = zones
+        .where((z) => z['division'] == selectedDivision)
+        .map(
+          (z) => {
+            'district': z['district'],
+            'rate': double.tryParse(z['rate'].toString()) ?? 0.0,
+          },
+        )
+        .toList();
+
+    setState(() {
+      division = selectedDivision;
+      districts = filteredDistricts;
+      district = null;
+      shippingRate = 0.0;
+    });
+  }
+
+  void _onDistrictSelected(String selectedDistrict) {
+    final districtData = districts.firstWhere(
+      (d) => d['district'] == selectedDistrict,
+      orElse: () => {},
     );
+    setState(() {
+      district = selectedDistrict;
+      shippingRate = districtData['rate'] ?? 0.0;
+    });
   }
 
   Widget _buildInputField({
@@ -166,12 +117,88 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // 🔹 Step 2 — Payment
+  // STEP 1
+  Widget _buildStepOne() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Shipping Information",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 20),
+          _buildInputField(
+            label: "Full Name",
+            icon: Icons.person_outline,
+            onSaved: (v) => fullName = v!,
+            validator: (v) => v!.isEmpty ? "Enter your name" : null,
+          ),
+          _buildInputField(
+            label: "Phone Number",
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            onSaved: (v) => phone = v!,
+            validator: (v) => v!.isEmpty ? "Enter phone number" : null,
+          ),
+          _buildInputField(
+            label: "Address",
+            icon: Icons.location_on_outlined,
+            onSaved: (v) => address = v!,
+            validator: (v) => v!.isEmpty ? "Enter address" : null,
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              labelText: "Division",
+              prefixIcon: const Icon(Icons.public_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+            ),
+            value: division,
+            items: divisions
+                .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                .toList(),
+            onChanged: (val) => _onDivisionSelected(val!),
+            validator: (v) => v == null ? "Select division" : null,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              labelText: "District",
+              prefixIcon: const Icon(Icons.map_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+            ),
+            value: district,
+            items: districts
+                .map(
+                  (d) => DropdownMenuItem<String>(
+                    value: d['district'] as String,
+                    child: Text(d['district'] as String),
+                  ),
+                )
+                .toList(),
+            onChanged: (val) => _onDistrictSelected(val!),
+            validator: (v) => v == null ? "Select district" : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // STEP 2
   Widget _buildStepTwo(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
     final double subtotal = cart.totalAmount;
-    const double shipping = 50.0;
-    final double total = subtotal + shipping;
+    final double total = subtotal + shippingRate;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,8 +254,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 12),
               _buildSummaryRow("Subtotal", "৳${subtotal.toStringAsFixed(2)}"),
               _buildSummaryRow(
-                "Delivery Charge",
-                "৳${shipping.toStringAsFixed(2)}",
+                "Shipping",
+                "৳${shippingRate.toStringAsFixed(2)}",
               ),
               const Divider(height: 20),
               Row(
@@ -274,204 +301,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // 🔹 Step 3 — Review Order
-  Widget _buildStepThree(BuildContext context) {
-    final cart = Provider.of<CartProvider>(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Review Order',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12), // Shipping & Payment Info Card
-        Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Shipping Details',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '$fullName\n$address, $district, $division\nPhone: $phone',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              ),
-              const Divider(height: 20, thickness: 1),
-              const Text(
-                'Payment Method',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.delivery_dining,
-                    color: Colors.green,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    paymentMethod == 'cash_on_delivery'
-                        ? 'Cash On Delivery'
-                        : 'Unknown',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ), // Items List
-        ...cart.items.values.map((item) {
-          return Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Row(
-              children: [
-                // Product Image / Placeholder
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                    image: item.imageUrl.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(item.imageUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: item.imageUrl.isEmpty
-                      ? const Center(
-                          child: Icon(
-                            Icons.image_not_supported,
-                            color: Colors.grey,
-                            size: 24,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 12), // Name & Qty
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Qty: ${item.quantity}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '৳${(item.price * item.quantity).toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-        const Divider(height: 30, thickness: 1), // Subtotal
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Subtotal',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '৳${cart.totalAmount.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12), // Shipping
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              'Shipping',
-              style: TextStyle(fontSize: 15, color: Colors.grey),
-            ),
-            Text('৳50.00', style: TextStyle(fontSize: 15, color: Colors.grey)),
-          ],
-        ),
-        const SizedBox(height: 12), // Total
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Total',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '৳${(cart.totalAmount + 50).toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // 🔹 Step 4 — Order Success
   Widget _buildStepFour(BuildContext context) {
+    final cart = Provider.of<CartProvider>(context, listen: false);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -499,37 +330,215 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           style: TextStyle(color: Colors.black54),
         ),
         const SizedBox(height: 40),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const MainScreen()),
-              (route) => false,
-            );
-          },
-          icon: const Icon(Icons.home_outlined),
-          label: const Text("Back to Home"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              cart.clearCart();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const MainScreen()),
+                (route) => false,
+              );
+            },
+            icon: const Icon(Icons.home),
+            label: const Text('Back To Home'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              foregroundColor: const Color.fromARGB(255, 34, 164, 34), // red text/icon
+              backgroundColor: const Color.fromARGB(255, 204, 255, 180), // soft red bg
+              side: const BorderSide(color: Color.fromARGB(255, 204, 255, 180)),
             ),
           ),
         ),
-        const SizedBox(height: 60),
       ],
     );
   }
 
-  // 🔹 Submit Order (moves to Step 4 on success)
   Future<void> _submitOrder(BuildContext context) async {
     setState(() => isLoading = true);
-    await Future.delayed(const Duration(seconds: 2)); // simulate request
+    await Future.delayed(const Duration(seconds: 2));
     setState(() {
       isLoading = false;
-      currentStep = 4; // ✅ go to success step
+      currentStep = 4;
     });
+  }
+
+  Widget _buildCenteredStepBar() {
+    final steps = ["Information", "Payment", "Review"];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(steps.length, (index) {
+        final stepNumber = index + 1;
+        final isCompleted = currentStep > stepNumber;
+        final isActive = currentStep == stepNumber;
+
+        Color color;
+        if (isCompleted) {
+          color = Colors.green;
+        } else if (isActive) {
+          color = Colors.orange;
+        } else {
+          color = Colors.grey.shade400;
+        }
+
+        return Expanded(
+          child: Column(
+            children: [
+              // Circle and line
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      color: index == 0
+                          ? Colors.transparent
+                          : (isCompleted ? Colors.green : Colors.grey.shade300),
+                    ),
+                  ),
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: color,
+                    child: Text(
+                      '$stepNumber',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      color: index == steps.length - 1
+                          ? Colors.transparent
+                          : (currentStep > stepNumber
+                                ? Colors.green
+                                : Colors.grey.shade300),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                steps[index],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  color: isActive || isCompleted ? Colors.black87 : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildStepThree(BuildContext context) {
+    final cart = Provider.of<CartProvider>(context);
+    final double subtotal = cart.totalAmount;
+    final double total = subtotal + shippingRate;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Review Your Order",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 20),
+
+        // Medicines List
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Items in your cart",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              ...cart.items.values.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "${item.name} x${item.quantity}",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      Text(
+                        "৳${(item.price * item.quantity).toStringAsFixed(2)}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Order Summary
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSummaryRow("Subtotal", "৳${subtotal.toStringAsFixed(2)}"),
+              _buildSummaryRow(
+                "Shipping",
+                "৳${shippingRate.toStringAsFixed(2)}",
+              ),
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Total",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  ),
+                  Text(
+                    "৳${total.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                      color: Colors.deepOrange,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -540,12 +549,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } else if (currentStep == 2) {
       stepContent = _buildStepTwo(context);
     } else if (currentStep == 3) {
-      stepContent = _buildStepThree(context);
-    } else {
+      stepContent = _buildStepThree(context); // New Review step
+    } else if (currentStep == 4) {
       stepContent = _buildStepFour(context);
+    } else {
+      stepContent = const SizedBox.shrink();
     }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Checkout'),
         centerTitle: true,
@@ -556,19 +568,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            if (currentStep < 4)
-              Row(
-                children: [
-                  _buildStepIndicator(1, 'Address'),
-                  _buildStepDivider(1),
-                  _buildStepIndicator(2, 'Payment'),
-                  _buildStepDivider(2),
-                  _buildStepIndicator(3, 'Review'),
-                ],
-              ),
-            const SizedBox(height: 20),
+            _buildCenteredStepBar(),
+            const SizedBox(height: 30),
             stepContent,
-            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -603,6 +605,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Text(
                     isLoading
                         ? 'Processing...'
+                        : currentStep == 2
+                        ? 'Review Order'
                         : currentStep == 3
                         ? 'Confirm Order'
                         : 'Continue',

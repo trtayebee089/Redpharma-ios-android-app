@@ -4,6 +4,10 @@ import 'screens/home.dart';
 import 'screens/categories_screen.dart';
 import 'screens/settings.dart';
 import 'screens/cart.dart';
+import 'main.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:redpharmabd_app/widgets/custom_bottombar.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -14,16 +18,59 @@ class MainScreen extends StatefulWidget {
 
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  bool _isBottomNavVisible = true;
   bool isLoggedIn = false;
   String userName = "John Doe";
   String? profileImageUrl;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CategoryScreen(),
-    const CartScreen(),
-    const SettingsScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  Future<void> _checkInternetConnection() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      _showNoInternetDialog();
+    }
+  }
+
+  void _showNoInternetDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.signal_wifi_off, color: Colors.red),
+            SizedBox(width: 8),
+            Text('No Internet Connection'),
+          ],
+        ),
+        content: const Text(
+          'An active internet connection is required to use this app. '
+          'Please connect to Wi-Fi or mobile data and try again.',
+          style: TextStyle(fontSize: 15, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              SystemNavigator.pop();
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text(
+              'Exit',
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -31,51 +78,55 @@ class MainScreenState extends State<MainScreen> {
     });
   }
 
-  // Public method to switch to Home tab
+  void switchToTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _isBottomNavVisible = !(index == 2 || index == 3);
+    });
+  }
+
   void switchToHomeTab() {
     setState(() {
       _selectedIndex = 0;
+      _isBottomNavVisible = true;
     });
+
+    homeScreenKey.currentState?.clearSearch();
+  }
+
+  void setBottomNavVisible(bool visible) {
+    setState(() {
+      _isBottomNavVisible = visible;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInternetConnection();
+
+    _screens = [
+      HomeScreen(key: homeScreenKey),
+      CategoryScreen(onToggleBottomNav: setBottomNavVisible),
+      const CartScreen(),
+      const SettingsScreen(),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _selectedIndex == 0
-          ? HomeAppBar(
-              onMenuTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SettingsScreen(),
-                  ),
-                );
-              },
-              onNotificationsTap: () {
-                // handle notification tap
-              },
-            )
-          : null,
+      appBar: _selectedIndex == 0 ? HomeAppBar() : null,
       body: _screens[_selectedIndex],
-      bottomNavigationBar: (_selectedIndex == 2 /* Cart */ )
+      bottomNavigationBar:
+          (!_isBottomNavVisible || _selectedIndex == 2 || _selectedIndex == 3)
           ? null
-          : BottomAppBar(
-              color: Colors.white,
-              elevation: 10,
-              child: SafeArea(
-                child: SizedBox(
-                  height: 60,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildNavItem(Icons.home, 'Home', 0),
-                      _buildNavItem(Icons.category, 'Categories', 1),
-                      _buildNavItem(Icons.shopping_cart, 'Cart', 2),
-                      _buildNavItem(Icons.settings, 'Settings', 3),
-                    ],
-                  ),
-                ),
-              ),
+          : ModernBottomBar(
+              currentIndex: _selectedIndex,
+              onTabSelected: (index) {
+                setState(() => _selectedIndex = index);
+                mainScreenKey.currentState?.switchToTab(index);
+              },
             ),
     );
   }
