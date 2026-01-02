@@ -47,155 +47,144 @@ class CartScreen extends StatelessWidget {
                       final item = cart.items.values.toList()[index];
                       final subtotal = item.price * item.quantity.toDouble();
 
-                      return Slidable(
-                        key: ValueKey(item.id),
-                        endActionPane: ActionPane(
-                          motion: const DrawerMotion(),
-                          extentRatio: 0.25,
-                          children: [
-                            CustomSlidableAction(
-                              onPressed: (_) => cart.removeItem(item.id),
-                              backgroundColor: Colors.transparent,
+                      return Stack(
+                        children: [
+                          // --- MAIN CARD ---
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(14.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      item.imageUrl,
+                                      width: 70,
+                                      height: 70,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Container(
+                                                width: 70,
+                                                height: 70,
+                                                color: Colors.grey.shade200,
+                                                child: const Icon(
+                                                  Icons.broken_image,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 14),
+
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                item.name,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.black87,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        const SizedBox(height: 2),
+
+                                        Text(
+                                          item.brand ?? "No Brand",
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 13.5,
+                                          ),
+                                        ),
+                                        Text(
+                                          "৳${item.price.toStringAsFixed(2)} / ${item.unit ?? 'unit'}",
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 5),
+
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              "৳${subtotal.toStringAsFixed(2)}",
+                                              style: const TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            _quantityControl(cart, item),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: GestureDetector(
+                              onTap: () => cart.removeItem(item.id),
                               child: Container(
+                                width: 32,
+                                height: 32,
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(12),
+                                  shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.redAccent,
                                     width: 1.2,
                                   ),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 12,
-                                ),
-                                child: const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.redAccent,
-                                      size: 22,
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      "Remove",
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.redAccent,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                  color: Colors.redAccent,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14.0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    item.imageUrl,
-                                    width: 70,
-                                    height: 70,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                              width: 70,
-                                              height: 70,
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(
-                                                Icons.broken_image,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              item.name,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            "৳${subtotal.toStringAsFixed(2)}",
-                                            style: const TextStyle(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        item.brand ?? "No Brand",
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 13.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            "৳${item.price.toStringAsFixed(2)} / ${item.unit ?? 'unit'}",
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          _quantityControl(cart, item),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        ],
                       );
                     },
                   ),

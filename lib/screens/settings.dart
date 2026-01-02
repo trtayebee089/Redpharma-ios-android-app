@@ -482,6 +482,17 @@ class _SettingsScreenState extends State<SettingsScreen> with RouteAware {
                             );
                           },
                         ),
+                        Divider(
+                          height: 1,
+                          color: Colors.grey[100], // lighter color
+                        ),
+                        _buildOption(
+                          icon: Icons.privacy_tip_outlined,
+                          title: "Delete Your Account",
+                          onTap: () => _launchURL(
+                            "https://redpharmabd.com/account-removal-request",
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -500,7 +511,7 @@ class _SettingsScreenState extends State<SettingsScreen> with RouteAware {
                         icon: Icons.privacy_tip_outlined,
                         title: "Privacy Policy",
                         onTap: () => _launchURL(
-                          "https://redpharma-vue.vercel.app/privacy-and-policy",
+                          "https://redpharmabd.com/privacy-and-policy",
                         ),
                       ),
                       Divider(height: 1, color: Colors.grey[100]),
@@ -508,7 +519,7 @@ class _SettingsScreenState extends State<SettingsScreen> with RouteAware {
                         icon: Icons.assignment_return_outlined,
                         title: "Refund & Returns",
                         onTap: () => _launchURL(
-                          "https://redpharma-vue.vercel.app/refund-and-returns",
+                          "https://redpharmabd.com/refund-and-returns",
                         ),
                       ),
                     ],

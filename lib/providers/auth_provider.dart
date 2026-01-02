@@ -102,6 +102,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> register({
     required String fullName,
     required String mobile,
+    required String email,
     required String address,
     required String password,
     required String gender,
@@ -116,6 +117,7 @@ class AuthProvider with ChangeNotifier {
 
       req.fields['name'] = fullName;
       req.fields['phone_number'] = mobile;
+      req.fields['email'] = email;
       req.fields['address'] = address;
       req.fields['gender'] = gender;
       req.fields['password'] = password;
@@ -145,6 +147,7 @@ class AuthProvider with ChangeNotifier {
         },
         body: jsonEncode({
           'name': fullName,
+          'email': email,
           'phone_number': mobile,
           'gender': gender,
           'address': address,
@@ -160,7 +163,7 @@ class AuthProvider with ChangeNotifier {
         await _persistToken(_token);
         notifyListeners();
       } else {
-        throw Exception(_extractMessage(regularResponse));
+        throw regularResponse;
       }
     }
   }
@@ -359,6 +362,50 @@ class AuthProvider with ChangeNotifier {
       debugPrint("🔴 Error fetching orders: $e");
       _orders = [];
       notifyListeners();
+    }
+  }
+
+  Future<void> requestPasswordReset(String mobile) async {
+    final url = Uri.parse(ApiEndpoints.forgetPassword);
+
+    try {
+      final response = await http.post(url, body: {'mobile': mobile});
+
+      if (response.statusCode != 200) {
+        throw Exception("Server error: ${response.body}");
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (data['success'] != true) {
+        throw Exception(data['message'] ?? "Failed to send reset code");
+      }
+
+      return;
+    } catch (e) {
+      throw Exception("Failed to send reset request: $e");
+    }
+  }
+
+  Future<void> verifyOtpAndReset({
+    required String mobile,
+    required String otp,
+    required String password,
+    required String password_confirmation,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiEndpoints.verifyOTP),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'mobile': mobile, 'otp': otp, 'password': password, 'password_confirmation': password_confirmation}),
+      );
+
+      if (response.statusCode != 200) {
+        final resData = jsonDecode(response.body);
+        throw Exception(resData['message'] ?? 'Failed to reset password');
+      }
+    } catch (e) {
+      throw Exception('Error resetting password: $e');
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:redpharmabd_app/screens/registration.dart';
 import 'package:redpharmabd_app/main_screen.dart';
 import 'package:redpharmabd_app/widgets/custom_snackbar.dart';
 import 'package:redpharmabd_app/constants/default_theme.dart';
+import 'package:redpharmabd_app/screens/forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
-      
+
       AppSnackbar.show(
         context,
         message: "Logged in successfully",
@@ -78,6 +79,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _openForgetScreen() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
+    );
+  }
+
   void _openRegistrationScreen() async {
     final result = await Navigator.push(
       context,
@@ -112,7 +120,6 @@ class _LoginScreenState extends State<LoginScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Center(
-                  // <-- centers content vertically within available height
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: SizedBox(
@@ -228,9 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             Align(
                               alignment: Alignment.centerLeft,
                               child: TextButton(
-                                onPressed: () {
-                                  // TODO: navigate to "forgot password"
-                                },
+                                onPressed: _openForgetScreen,
                                 style: TextButton.styleFrom(
                                   foregroundColor: Colors.black87,
                                 ),

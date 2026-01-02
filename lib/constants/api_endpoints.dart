@@ -1,5 +1,5 @@
 class ApiEndpoints {
-  static const String baseUrl = 'https://redpharma-api.techrajshahi.com/api';
+  static const String baseUrl = 'https://9119063793ad.ngrok-free.app/api';
 
   // public routes
   static const String rewardPointTiers = '$baseUrl/reward-point-tiers';
@@ -9,7 +9,7 @@ class ApiEndpoints {
   static const String featuredProducts = '$baseUrl/products/featured';
   static const String bestSellingProducts = '$baseUrl/products/best-selling';
   static const String searchProducts = '$baseUrl/search';
-  static const String productDetails = '$baseUrl/products'; // append /{slug}
+  static const String productDetails = '$baseUrl/products';
 
   static const String banners = '$baseUrl/banners';
   static const String privacyPolicy = '$baseUrl/pages/privacy-and-policy';
@@ -23,4 +23,7 @@ class ApiEndpoints {
   static const String orderDetail = '$baseUrl/customer/orders'; // append /{order_id}
   static const String updateProfile = '$baseUrl/customer/profile/update';
   static const String changePassword = '$baseUrl/customer/profile/update-password';  
+  static const String forgetPassword = '$baseUrl/customer/forget-password';  
+  static const String verifyOTP = '$baseUrl/customer/verify-otp';  
+
 }

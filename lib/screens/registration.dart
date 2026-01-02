@@ -7,6 +7,8 @@ import 'package:redpharmabd_app/main.dart';
 import 'package:redpharmabd_app/main_screen.dart';
 import 'package:redpharmabd_app/widgets/custom_snackbar.dart';
 import 'package:redpharmabd_app/constants/default_theme.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({Key? key}) : super(key: key);
@@ -20,6 +22,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   final _nameCtrl = TextEditingController();
   final _mobileCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -76,6 +79,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       await Provider.of<AuthProvider>(context, listen: false).register(
         fullName: _nameCtrl.text.trim(),
         mobile: _mobileCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         password: _passwordCtrl.text,
         gender: _selectedGender!.toLowerCase(),
@@ -84,18 +88,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context);
+
+      // Success: show snackbar and go back
       AppSnackbar.show(
         context,
         message: 'Account created successfully',
         icon: Icons.check_circle_outline,
         backgroundColor: DefaultTheme.green,
       );
+
+      Navigator.pop(context);
     } catch (e) {
+      String message = 'Registration failed';
+
+      if (e is http.Response) {
+        final data = jsonDecode(e.body);
+        if (data['errors'] != null) {
+          message = data['errors'].values.map((v) => v.join('\n')).join('\n');
+        } else if (data['message'] != null) {
+          message = data['message'];
+        }
+      } else if (e is Exception) {
+        message = e.toString();
+      }
+
       AppSnackbar.show(
         context,
-        message: 'Registration failed: ${e.toString()}',
-        icon: Icons.check_circle_outline,
+        message: message,
+        icon: Icons.error_outline,
         backgroundColor: DefaultTheme.red,
       );
     } finally {
@@ -107,6 +127,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _mobileCtrl.dispose();
+    _emailCtrl.dispose();
     _addressCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
@@ -210,6 +231,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           ),
                           const SizedBox(height: 12),
 
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            decoration: _inputDecoration(
+                              label: 'Email Address',
+                              icon: Icons.email_outlined,
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty)
+                                return 'Enter your email';
+                              final emailRegex = RegExp(
+                                r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                              );
+                              if (!emailRegex.hasMatch(v))
+                                return 'Enter a valid email';
+                              return null;
+                            },
+                          ),
+
+                          const SizedBox(height: 12),
+
                           // Gender Dropdown
                           InputDecorator(
                             decoration: InputDecoration(
@@ -233,7 +276,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                   width: 1.5,
                                 ),
                               ),
-                              floatingLabelStyle: TextStyle(color: DefaultTheme.green),
+                              floatingLabelStyle: TextStyle(
+                                color: DefaultTheme.green,
+                              ),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
