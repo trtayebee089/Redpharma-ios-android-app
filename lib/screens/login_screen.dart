@@ -79,10 +79,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _openForgetScreen() async {
-    await Navigator.push(
+  void _openForgetScreen() {
+    debugPrint('Forget Screen Clicked');
+    Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
+      MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
     );
   }
 

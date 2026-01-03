@@ -1,5 +1,5 @@
 class ApiEndpoints {
-  static const String baseUrl = 'https://9119063793ad.ngrok-free.app/api';
+  static const String baseUrl = 'https://redpharma-api.techrajshahi.com/api';
 
   // public routes
   static const String rewardPointTiers = '$baseUrl/reward-point-tiers';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:redpharmabd_app/constants/default_theme.dart';
@@ -25,11 +26,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   String confirmPassword = '';
 
   bool isLoading = false;
+  late Timer _timer;
+  int _countdown = 60; // 60 seconds countdown
+  bool _canResendOtp = false;
 
   @override
   void initState() {
     super.initState();
     _mobileController.text = mobile;
+    _startTimer();
   }
 
   @override
@@ -37,7 +42,59 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     _mobileController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _timer.cancel();
     super.dispose();
+  }
+
+  void _startTimer() {
+    _canResendOtp = false;
+    _countdown = 60;
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_countdown > 0) {
+        setState(() {
+          _countdown--;
+        });
+      } else {
+        setState(() {
+          _canResendOtp = true;
+        });
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _resendOtp() async {
+    if (!_canResendOtp || mobile.isEmpty) return;
+
+    setState(() => isLoading = true);
+
+    try {
+      await Provider.of<AuthProvider>(
+        context,
+        listen: false,
+      ).requestPasswordReset(mobile);
+
+      // Restart the timer
+      _startTimer();
+
+      AppSnackbar.show(
+        context,
+        message: "OTP has been resent to your mobile",
+        icon: Icons.check_circle_outline,
+        backgroundColor: DefaultTheme.green,
+      );
+    } catch (e, stack) {
+      debugPrint("❌ resend OTP error: $e\n$stack");
+      AppSnackbar.show(
+        context,
+        message: e.toString(),
+        icon: Icons.error_outline,
+        backgroundColor: DefaultTheme.red,
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   InputDecoration _inputDecoration({
@@ -149,9 +206,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _mobileController.text = mobile;
       setState(() => currentStep = 2);
 
+      // Start countdown timer when OTP is sent
+      _startTimer();
+
       AppSnackbar.show(
         context,
-        message: "OTP has been sent to your mobile",
+        message: "OTP has been sent to your email",
         icon: Icons.check_circle_outline,
         backgroundColor: DefaultTheme.green,
       );
@@ -336,6 +396,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return "Back to Login";
   }
 
+  String _formatCountdown() {
+    final minutes = (_countdown ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_countdown % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -345,38 +411,95 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         backgroundColor: Colors.white,
         elevation: 1,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              _buildStepBar(),
-              const SizedBox(height: 30),
-              _buildStepContent(),
-            ],
+      body: Container(
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildStepBar(),
+                const SizedBox(height: 30),
+                _buildStepContent(),
+              ],
+            ),
           ),
         ),
       ),
       bottomNavigationBar: Container(
+        color: Colors.white,
         padding: const EdgeInsets.all(16),
-        child: ElevatedButton(
-          onPressed: isLoading ? null : _onBottomButtonPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: DefaultTheme.green,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Resend OTP button (only shown in step 2)
+            if (currentStep == 2)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _canResendOtp ? _resendOtp : null,
+                        icon: Icon(
+                          Icons.refresh,
+                          color: _canResendOtp
+                              ? DefaultTheme.green
+                              : Colors.grey,
+                        ),
+                        label: Text(
+                          _canResendOtp
+                              ? 'Resend OTP'
+                              : 'Resend OTP in ${_formatCountdown()}',
+                          style: TextStyle(
+                            color: _canResendOtp
+                                ? DefaultTheme.green
+                                : Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(
+                            color: _canResendOtp
+                                ? DefaultTheme.green
+                                : Colors.grey.shade300,
+                          ),
+                          backgroundColor: _canResendOtp
+                              ? DefaultTheme.green.withOpacity(0.1)
+                              : Colors.grey.shade100,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Main action button
+            ElevatedButton(
+              onPressed: isLoading ? null : _onBottomButtonPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DefaultTheme.green,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: Text(
+                isLoading ? "Processing..." : _getButtonText(),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
-          ),
-          child: Text(
-            isLoading ? "Processing..." : _getButtonText(),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+          ],
         ),
       ),
     );
