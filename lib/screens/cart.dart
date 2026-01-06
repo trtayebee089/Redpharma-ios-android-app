@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:redpharmabd_app/main_screen.dart';
 import 'package:redpharmabd_app/main.dart';
 import 'package:redpharmabd_app/providers/cart_provider.dart';
 import 'package:redpharmabd_app/screens/checkout.dart';
@@ -226,7 +226,11 @@ class CartScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => mainScreenKey.currentState?.switchToHomeTab(),
+                onPressed: () => Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MainScreen()),
+                  (route) => false,
+                ),
                 icon: const Icon(Icons.home_outlined),
                 label: const Text(
                   "Return to Home",

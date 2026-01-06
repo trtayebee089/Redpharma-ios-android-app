@@ -10,6 +10,7 @@ class ApiEndpoints {
   static const String bestSellingProducts = '$baseUrl/products/best-selling';
   static const String searchProducts = '$baseUrl/search';
   static const String productDetails = '$baseUrl/products';
+  static const String checkout = '$baseUrl/checkout';
 
   static const String banners = '$baseUrl/banners';
   static const String privacyPolicy = '$baseUrl/pages/privacy-and-policy';

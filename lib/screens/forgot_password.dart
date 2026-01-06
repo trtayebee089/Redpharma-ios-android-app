@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:redpharmabd_app/constants/default_theme.dart';
@@ -34,7 +35,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   void initState() {
     super.initState();
     _mobileController.text = mobile;
-    _startTimer();
   }
 
   @override
@@ -206,7 +206,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _mobileController.text = mobile;
       setState(() => currentStep = 2);
 
-      // Start countdown timer when OTP is sent
       _startTimer();
 
       AppSnackbar.show(
@@ -216,10 +215,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         backgroundColor: DefaultTheme.green,
       );
     } catch (e, stack) {
-      debugPrint("❌ requestPasswordReset error: $e\n$stack");
+      String errorMessage = "Something went wrong";
+
+      try {
+        final jsonStart = e.toString().indexOf('{');
+        if (jsonStart != -1) {
+          final jsonString = e.toString().substring(jsonStart);
+          final Map<String, dynamic> data = jsonDecode(jsonString);
+          if (data['message'] != null) {
+            errorMessage = data['message'];
+          }
+        } else {
+          errorMessage = e.toString();
+        }
+      } catch (_) {
+        // fallback if parsing fails
+        errorMessage = e.toString();
+      }
+
       AppSnackbar.show(
         context,
-        message: e.toString(),
+        message: errorMessage,
         icon: Icons.error_outline,
         backgroundColor: DefaultTheme.red,
       );

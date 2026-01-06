@@ -55,7 +55,7 @@ class ModernBottomBar extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? Colors.redAccent.withOpacity(0.08)
+                        ? Colors.green.withOpacity(0.08)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -69,22 +69,23 @@ class ModernBottomBar extends StatelessWidget {
                         width: 28,
                         decoration: BoxDecoration(
                           gradient: isActive
-                              ? const LinearGradient(
-                                  colors: [Colors.redAccent, Colors.orangeAccent],
+                              ? LinearGradient(
+                                  colors: [Colors.green.shade400, Colors.teal.shade600],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 )
                               : null,
-                          color:
-                              isActive ? null : Colors.grey.shade400.withOpacity(0.3),
+                          color: isActive
+                              ? null
+                              : Colors.grey.shade400.withOpacity(0.3),
                           shape: BoxShape.circle,
                           boxShadow: isActive
                               ? [
                                   BoxShadow(
-                                    color: Colors.redAccent.withOpacity(0.3),
+                                    color: Colors.green.withOpacity(0.1),
                                     blurRadius: 8,
                                     offset: const Offset(0, 3),
-                                  )
+                                  ),
                                 ]
                               : [],
                         ),
@@ -99,10 +100,11 @@ class ModernBottomBar extends StatelessWidget {
                         duration: const Duration(milliseconds: 250),
                         style: GoogleFonts.poppins(
                           fontSize: 12,
-                          fontWeight:
-                              isActive ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: isActive
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                           color: isActive
-                              ? Colors.redAccent
+                              ? Colors.green
                               : Colors.grey.shade600,
                         ),
                         child: Text(item['label'] as String),

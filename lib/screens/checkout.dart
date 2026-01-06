@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:redpharmabd_app/providers/cart_provider.dart';
+import 'package:redpharmabd_app/providers/auth_provider.dart';
 import 'package:redpharmabd_app/main_screen.dart';
 import 'package:redpharmabd_app/constants/api_endpoints.dart';
+import 'package:redpharmabd_app/models/checkout_response.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
@@ -16,6 +18,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   int currentStep = 1;
   final _formKey = GlobalKey<FormState>();
+  CheckoutResponse? checkoutResponse;
 
   String fullName = '';
   String phone = '';
@@ -57,6 +60,104 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       debugPrint("⚠️ Error fetching zones: $e");
     }
+  }
+
+  double _getDiscountRate(AuthProvider auth) {
+    double baseDiscount = 5.0;
+
+    if (auth.isLoggedIn &&
+        auth.membership != null &&
+        auth.membership!['discount'] != null) {
+      return double.tryParse(auth.membership!['discount'].toString()) ??
+          baseDiscount;
+    }
+
+    return baseDiscount;
+  }
+
+  double _calculateDiscountAmount(double subtotal, double rate) {
+    return (subtotal * rate) / 100;
+  }
+
+  Future<void> _submitOrder(BuildContext context) async {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+
+    setState(() => isLoading = true);
+
+    try {
+      final subtotal = cart.totalAmount;
+
+      final discountRate = _getDiscountRate(auth);
+      final discountAmount = _calculateDiscountAmount(subtotal, discountRate);
+
+      final totalAfterDiscount = subtotal - discountAmount + shippingRate;
+
+      final payload = {
+        "user_id": auth.isLoggedIn && auth.userData != null
+            ? auth.userData!['id'] as int
+            : null,
+        "warehouse_id": 1,
+        "sale_status": 0,
+        "payment_status": 0,
+        "paid_amount": 0,
+        "sale_type": "website",
+
+        "customer": {"name": fullName, "phone": phone, "address": address},
+
+        "subtotal": subtotal,
+        "shipping_cost": shippingRate,
+        "total": totalAfterDiscount,
+
+        "order_discount_type": "percentage",
+        "order_discount_value": discountRate,
+        "discount_value": discountAmount,
+        "discount_applied": true,
+
+        "items": cart.items.values.map((item) {
+          return {
+            "product_id": item.id,
+            "qty": item.quantity,
+            "net_unit_price": item.price,
+            "discount": 0,
+            "tax_rate": 0,
+            "tax": 0,
+            "total": item.price * item.quantity,
+          };
+        }).toList(),
+
+        "uniqueItems": cart.items.length,
+        "total_qty": cart.totalItems,
+      };
+
+      final response = await http.post(
+        Uri.parse(ApiEndpoints.checkout),
+        headers: {
+          "Content-Type": "application/json",
+          if (auth.token != null) "Authorization": "Bearer ${auth.token}",
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        checkoutResponse = CheckoutResponse.fromJson(data);
+        cart.clearCart();
+
+        setState(() => currentStep = 4);
+      } else {
+        throw Exception("Checkout failed");
+      }
+    } catch (e) {
+      debugPrint("❌ Checkout Error: $e");
+      _showError("Failed to place order");
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _onDivisionSelected(String selectedDivision) {
@@ -197,8 +298,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // STEP 2
   Widget _buildStepTwo(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
+
     final double subtotal = cart.totalAmount;
-    final double total = subtotal + shippingRate;
+    final discountRate = _getDiscountRate(auth);
+    final discountAmount = _calculateDiscountAmount(subtotal, discountRate);
+    final total = subtotal - discountAmount + shippingRate;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,6 +362,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 "Shipping",
                 "৳${shippingRate.toStringAsFixed(2)}",
               ),
+              _buildSummaryRow(
+                "Discount (${discountRate.toStringAsFixed(0)}%)",
+                "-৳${discountAmount.toStringAsFixed(2)}",
+              ),
               const Divider(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -301,70 +410,118 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _infoCard(String label, String? value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.black54)),
+          Text(
+            value ?? "-",
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // STEP 4
   Widget _buildStepFour(BuildContext context) {
-    final cart = Provider.of<CartProvider>(context, listen: false);
+    final sale = checkoutResponse?.sale;
+    final tracking = checkoutResponse?.tracking;
+
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 50),
-        Container(
-          padding: const EdgeInsets.all(30),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.green.withOpacity(0.1),
-          ),
-          child: const Icon(Icons.check_circle, color: Colors.green, size: 100),
+        const SizedBox(height: 30),
+
+        const Center(
+          child: Icon(Icons.check_circle, size: 100, color: Colors.green),
         ),
-        const SizedBox(height: 20),
-        const Text(
-          "Order Successfully Placed!",
-          style: TextStyle(
-            color: Colors.green,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+
+        const SizedBox(height: 16),
+        const Center(
+          child: Text(
+            "Order Successfully Placed!",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
-        const SizedBox(height: 10),
-        const Text(
-          "We’ll process your order shortly.",
-          style: TextStyle(color: Colors.black54),
-        ),
+
+        const SizedBox(height: 30),
+
+        _infoCard("Order Reference", sale?['reference_no']),
+        _infoCard("Tracking Number", tracking?['tracking_no']),
+        _infoCard("Total Amount", "৳${sale?['grand_total']}"),
+
+        /// SHOW LOGIN INFO ONLY FOR NEW CUSTOMER
+        if (checkoutResponse?.isNewCustomer == true) ...[
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Login Credentials",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Email: ${sale?['customer']?['email'] != null && sale!['customer']!['email'].toString().isNotEmpty ? sale['customer']!['email'] : 'Contact support to update your email address'}",
+                ),
+                Text(
+                  "Temporary Password: ${checkoutResponse?.temporaryPassword}",
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  "Please login and change your password.",
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+        ],
+
         const SizedBox(height: 40),
+
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () {
-              cart.clearCart();
-              Navigator.pushAndRemoveUntil(
+            onPressed: () => Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const MainScreen()),
                 (route) => false,
-              );
-            },
-            icon: const Icon(Icons.home),
-            label: const Text('Back To Home'),
+              ),            
+            icon: const Icon(Icons.home_outlined),
+            label: const Text(
+              "Return to Home",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
+              foregroundColor: Colors.red.shade700,
+              side: BorderSide(color: Colors.red.shade200),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              foregroundColor: const Color.fromARGB(255, 34, 164, 34), // red text/icon
-              backgroundColor: const Color.fromARGB(255, 204, 255, 180), // soft red bg
-              side: const BorderSide(color: Color.fromARGB(255, 204, 255, 180)),
+              backgroundColor: Colors.red.shade50,
             ),
           ),
         ),
       ],
     );
-  }
-
-  Future<void> _submitOrder(BuildContext context) async {
-    setState(() => isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      isLoading = false;
-      currentStep = 4;
-    });
   }
 
   Widget _buildCenteredStepBar() {
@@ -441,10 +598,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // STEP 3
   Widget _buildStepThree(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
+
     final double subtotal = cart.totalAmount;
-    final double total = subtotal + shippingRate;
+    final discountRate = _getDiscountRate(auth);
+    final discountAmount = _calculateDiscountAmount(subtotal, discountRate);
+    final total = subtotal - discountAmount + shippingRate;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,6 +678,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 "Shipping",
                 "৳${shippingRate.toStringAsFixed(2)}",
               ),
+              _buildSummaryRow(
+                "Discount (${discountRate.toStringAsFixed(0)}%)",
+                "-৳${discountAmount.toStringAsFixed(2)}",
+              ),
               const Divider(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -549,7 +715,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } else if (currentStep == 2) {
       stepContent = _buildStepTwo(context);
     } else if (currentStep == 3) {
-      stepContent = _buildStepThree(context); // New Review step
+      stepContent = _buildStepThree(context);
     } else if (currentStep == 4) {
       stepContent = _buildStepFour(context);
     } else {

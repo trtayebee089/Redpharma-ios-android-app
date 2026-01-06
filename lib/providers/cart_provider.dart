@@ -36,10 +36,9 @@ class CartProvider with ChangeNotifier {
 
   void addItem(Map<String, dynamic> product) {
     final id = product['id'].toString();
-    debugPrint('Adding product to cart: $product');
-
+    
     if (_items.containsKey(id)) {
-      _items[id]!.quantity += 1; // increase quantity
+      _items[id]!.quantity += 1;
     } else {
       _items[id] = CartItem(
         id: id,
